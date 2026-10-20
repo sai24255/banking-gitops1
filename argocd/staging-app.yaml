@@ -6,16 +6,23 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: https://github.com/sai24255/banking-gitops1.git
-    targetRevision: main
-    path: apps/banking-app
-    helm:
-      valueFiles:
-        - values.yaml
+
+  sources:
+    - repoURL: https://github.com/sai24255/banking-gitops1.git
+      targetRevision: main
+      path: apps/banking-app
+      helm:
+        valueFiles:
+          - $values/environments/staging/values.yaml
+
+    - repoURL: https://github.com/sai24255/banking-gitops1.git
+      targetRevision: main
+      ref: values
+
   destination:
     server: https://kubernetes.default.svc
     namespace: banking-staging
+
   syncPolicy:
     automated:
       prune: true

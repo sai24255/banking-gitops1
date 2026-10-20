@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/sai24255/banking-app1
-  tag: "2d343d48f38a8b98d4612730f3ad7ce5bdcb6c5f"
+  tag: "e36ef3f77abc3f5cdb30faf564356e4721f612af"
   pullPolicy: IfNotPresent
 
 service:

@@ -1,0 +1,27 @@
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-app-dev
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/sai24255/banking-gitops1.git
+      targetRevision: main
+      path: apps/banking-app
+      helm:
+        valueFiles:
+          - $values/environments/dev/values.yaml
+    - repoURL: https://github.com/sai24255/banking-gitops1.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

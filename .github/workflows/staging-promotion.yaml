@@ -1,0 +1,97 @@
+
+name: Promote Dev Image to Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote-staging
+  cancel-in-progress: false
+
+jobs:
+  promote-staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+
+      - name: Read Dev image SHA
+        id: image
+        shell: bash
+        run: |
+          TAG=$(python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("environments/dev/values.yaml").read_text()
+          match = re.search(
+              r"""(?m)^\s+tag:\s*["']?([a-f0-9]{40})["']?\s*$""",
+              text
+          )
+
+          if not match:
+              raise SystemExit("ERROR: No valid 40-character image SHA in Dev values")
+
+          print(match.group(1))
+          PY
+          )
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Dev image SHA: $TAG"
+
+      - name: Verify image exists in GHCR
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        run: |
+          docker manifest inspect \
+            "ghcr.io/sai24255/banking-app1:${IMAGE_TAG}"
+
+      - name: Update Staging image SHA
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        shell: bash
+        run: |
+          python - "$IMAGE_TAG" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path("environments/staging/values.yaml")
+          tag = sys.argv[1]
+          text = path.read_text()
+
+          updated, count = re.subn(
+              r"""(?m)^(\s+tag:\s*)["']?[^"'\s]+["']?\s*$""",
+              lambda m: f'{m.group(1)}"{tag}"',
+              text,
+              count=1,
+          )
+
+          if count != 1:
+              raise SystemExit("ERROR: Could not find Staging image tag")
+
+          path.write_text(updated)
+          PY
+
+      - name: Commit and push Staging promotion
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add environments/staging/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "Staging already uses this image SHA."
+            exit 0
+          fi
+
+          git commit -m \
+            "Promote banking-app ${{ steps.image.outputs.tag }} to staging"
+
+          git push origin HEAD:main
